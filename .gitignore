@@ -8,3 +8,6 @@ node_modules/
 # The Owner's Likeness and personal data never go into git
 likeness/
 data/
+
+# The Owner's 3D avatar is Likeness: never committed
+web/public/avatar/
