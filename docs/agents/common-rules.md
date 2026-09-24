@@ -15,3 +15,4 @@ You are one of several agents building Keepsake in parallel. Each agent has its 
 4. Web app: Next.js + TypeScript in `web/`, using pnpm.
 5. Never commit personal data, audio, video or model weights. `likeness/` and `data/` are gitignored.
 6. When done, write a short report at `docs/agents/reports/<your-branch-name>.md`: what you built, how to run it, what you verified, and what's unverified or left undone. Commit it.
+7. Database tests: use ONLY your own test database, `postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_<branch>` where `<branch>` is your branch name without `feat/` and with `-` replaced by `_` (e.g. `test_memory`). It already exists and has pgvector. You may create and drop tables in it freely. Never touch the `keepsake` database from tests.
