@@ -1,31 +1,31 @@
 """Shared pytest configuration and fixtures for Keepsake tests.
 
-This module:
-- Overrides DATABASE_URL to use the test database (test_test_infra)
-- Provides a db_session fixture that creates tables and rolls back per test
-- Provides a client fixture (FastAPI TestClient) with fakes injected
-- Registers pytest markers (unit, db, slow)
+- Points the app at a test database (TEST_DATABASE_URL) before it is imported
+- db_session: every change is rolled back after the test, even if the code under test commits
+- client: FastAPI TestClient using the test session and fake providers
+- `live` tests (real APIs) are skipped unless RUN_LIVE=1
 """
 
 import os
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
 
-# Set test database URL BEFORE importing app, which reads it from config
-TEST_DATABASE_URL = "postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_test_infra"
+# Set before importing app, which reads DATABASE_URL from config.
+# Each branch/agent sets TEST_DATABASE_URL to its own database; CI uses test_ci.
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_main"
+)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
-# Now we can import the app
-from app.db import Base, get_session
-from app.main import app
-from app.providers import Embedder, FaceRenderer, LLM, SpeechToText, VoiceSynth
-from app.conversation.contracts import MemoryRecall
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
 
-from tests.fakes import (
+from app.db import Base, get_session  # noqa: E402
+from app.main import app  # noqa: E402
+from app.providers import registry  # noqa: E402
+from tests.fakes import (  # noqa: E402
     FakeEmbedder,
     FakeFaceRenderer,
     FakeLLM,
@@ -34,74 +34,67 @@ from tests.fakes import (
     FakeVoiceSynth,
 )
 
-
-# Create engine for test database
 test_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
-TestSessionLocal = sessionmaker(test_engine, expire_on_commit=False)
 
 
-@pytest.fixture
-def db_session() -> Iterator[Session]:
-    """Fixture: a database session that creates tables and rolls back per test.
+def pytest_collection_modifyitems(config, items):
+    if os.environ.get("RUN_LIVE") == "1":
+        return
+    skip_live = pytest.mark.skip(reason="live test: set RUN_LIVE=1 to run against real APIs")
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip_live)
 
-    This fixture:
-    1. Creates all tables from app.db.Base.metadata
-    2. Yields a session for the test
-    3. Rolls back all changes after the test (via transaction rollback)
-    4. Does NOT drop tables (faster for sequential tests)
 
-    Each test gets an isolated session that sees only changes made within that test.
-    """
-    # Create all tables (idempotent)
+@pytest.fixture(scope="session")
+def _test_tables() -> None:
     with test_engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(test_engine)
 
-    # Start a transaction for this test
-    session = TestSessionLocal()
-    session.begin_nested()  # Savepoint; allows rollback without closing connection
 
+@pytest.fixture
+def db_session(_test_tables) -> Iterator[Session]:
+    """Bound to one connection inside an outer transaction; session.commit() only releases a
+    savepoint, so nothing reaches the database for real."""
+    connection = test_engine.connect()
+    outer = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False)
     try:
         yield session
     finally:
-        # Rollback all changes made in this test
-        session.rollback()
         session.close()
+        outer.rollback()
+        connection.close()
 
 
 @pytest.fixture
 def fake_llm() -> FakeLLM:
-    """Fixture: a fake LLM for testing."""
     return FakeLLM()
 
 
 @pytest.fixture
 def fake_embedder() -> FakeEmbedder:
-    """Fixture: a fake embedder for testing."""
     return FakeEmbedder()
 
 
 @pytest.fixture
 def fake_stt() -> FakeSpeechToText:
-    """Fixture: a fake speech-to-text for testing."""
     return FakeSpeechToText()
 
 
 @pytest.fixture
 def fake_voice_synth() -> FakeVoiceSynth:
-    """Fixture: a fake voice synth for testing."""
     return FakeVoiceSynth()
 
 
 @pytest.fixture
 def fake_face_renderer() -> FakeFaceRenderer:
-    """Fixture: a fake face renderer for testing."""
     return FakeFaceRenderer()
 
 
 @pytest.fixture
 def fake_memory_recall() -> FakeMemoryRecall:
-    """Fixture: a fake memory recall for testing."""
     return FakeMemoryRecall()
 
 
@@ -113,29 +106,18 @@ def client(
     fake_stt: FakeSpeechToText,
     fake_voice_synth: FakeVoiceSynth,
     fake_face_renderer: FakeFaceRenderer,
-    fake_memory_recall: FakeMemoryRecall,
-) -> TestClient:
-    """Fixture: FastAPI TestClient with dependency overrides.
+) -> Iterator[TestClient]:
+    """TestClient on the test session, with every registry.get_<kind>() returning a fake.
 
-    This client:
-    - Uses the test database (via db_session fixture)
-    - Uses all fake providers (never real API keys)
-    - Is ready for immediate use in tests
-
-    Usage:
-        def test_health(client):
-            response = client.get("/health")
-            assert response.status_code == 200
+    Override keys match the get_<kind> names in app/providers/registry.py.
     """
-
-    def override_get_session():
-        """Override FastAPI's get_session to use test session."""
-        yield db_session
-
-    # Override dependency for database session
-    app.dependency_overrides[get_session] = override_get_session
-
-    # Override provider factories (would be in registry or dependency injection later)
-    # For now, the fakes are passed to tests via fixtures if needed.
-
-    return TestClient(app)
+    app.dependency_overrides[get_session] = lambda: db_session
+    registry.override(
+        llm=fake_llm, stt=fake_stt, embedder=fake_embedder, voice=fake_voice_synth, face=fake_face_renderer
+    )
+    try:
+        # No `with`: the lifespan would run create_all against the app's own engine.
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+        registry.clear_overrides()

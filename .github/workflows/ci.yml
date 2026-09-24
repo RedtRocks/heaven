@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main, feat/*, bugfix/*, docs/*]
+    branches: [main, "feat/**"]
   pull_request:
     branches: [main]
 
 jobs:
   backend-tests:
-    name: Backend Tests
+    name: Backend tests
     runs-on: ubuntu-latest
 
     services:
@@ -20,61 +20,60 @@ jobs:
           POSTGRES_DB: keepsake
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
         ports:
           - 5433:5432
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://keepsake:keepsake@localhost:5433/test_ci
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
 
       - name: Create test database
         env:
           PGPASSWORD: keepsake
         run: |
-          psql -h localhost -U keepsake -d keepsake -c "CREATE DATABASE test_test_infra;" || true
-          psql -h localhost -U keepsake -d test_test_infra -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
-        continue-on-error: true
+          psql -h localhost -p 5433 -U keepsake -d keepsake -c "CREATE DATABASE test_ci;"
+          psql -h localhost -p 5433 -U keepsake -d test_ci -c "CREATE EXTENSION vector;"
 
       - name: Run pytest
         working-directory: backend
-        env:
-          DATABASE_URL: postgresql+psycopg://keepsake:keepsake@localhost:5433/test_test_infra
         run: uv run pytest -q
 
   web-tests:
-    name: Web Tests
+    name: Web lint and build
     runs-on: ubuntu-latest
-    if: hashFiles('web/package.json') != ''
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Check for web app
+        id: web
+        run: echo "exists=$([ -f web/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.web.outputs.exists == 'true'
         with:
-          node-version: "20"
+          package_json_file: web/package.json
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        if: steps.web.outputs.exists == 'true'
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install, lint, build
+        if: steps.web.outputs.exists == 'true'
         working-directory: web
-        run: pnpm install
-
-      - name: Run lint
-        working-directory: web
-        run: pnpm lint
-
-      - name: Run build
-        working-directory: web
-        run: pnpm build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm build

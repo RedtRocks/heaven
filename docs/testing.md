@@ -113,10 +113,10 @@ def test_with_database(db_session):
 Tests use a dedicated test database to avoid touching the live `keepsake` database:
 
 ```
-postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_test_infra
+postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_main
 ```
 
-(By rule: `test_<branch>` where `<branch>` is your branch name with `feat/` removed and `-` replaced by `_`. This branch is `feat/test-infra`, so it's `test_test_infra`.)
+(By rule: `test_<branch>` where `<branch>` is your branch name with `feat/` removed and `-` replaced by `_`. This branch is `feat/test-infra`, so it's `test_main`.)
 
 The test database exists and has pgvector enabled. Each test:
 

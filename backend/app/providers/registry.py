@@ -1,10 +1,27 @@
-"""Picks provider implementations from config. The only place that knows which vendor is in use."""
+"""Picks provider implementations from config. The only place that knows which vendor is in use.
+
+Every get_* function checks `_overrides` first, so tests can swap in fakes with `override(...)`
+no matter how the calling code obtained the provider.
+"""
 
 from app.config import Settings, get_settings
 from app.providers import LLM, SpeechToText
 
+_overrides: dict[str, object] = {}
+
+
+def override(**providers: object) -> None:
+    """Force providers by kind, e.g. override(llm=FakeLLM()). Keys match the get_<kind> names."""
+    _overrides.update(providers)
+
+
+def clear_overrides() -> None:
+    _overrides.clear()
+
 
 def get_llm(settings: Settings | None = None) -> LLM:
+    if "llm" in _overrides:
+        return _overrides["llm"]  # type: ignore[return-value]
     s = settings or get_settings()
     if s.llm_provider == "gemini":
         from app.providers.llm_gemini import GeminiLLM
@@ -18,6 +35,8 @@ def get_llm(settings: Settings | None = None) -> LLM:
 
 
 def get_stt(settings: Settings | None = None) -> SpeechToText:
+    if "stt" in _overrides:
+        return _overrides["stt"]  # type: ignore[return-value]
     s = settings or get_settings()
     from app.providers.stt_groq import GroqSpeechToText
 

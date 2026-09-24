@@ -26,5 +26,6 @@ markers = [
     "unit: tests that require no database or network",
     "db: tests that require the test database",
     "slow: tests that take a long time (skipped by default)",
+    "live: tests that call real APIs (skipped unless RUN_LIVE=1)",
 ]
 addopts = "-m 'not slow'"
