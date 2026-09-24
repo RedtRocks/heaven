@@ -1,19 +1,31 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { post } from "@/lib/api";
+import { getApiUrl, post } from "@/lib/api";
 import VideoReplyButton from "./VideoReplyButton";
+
+interface Citation {
+  memoryId: number;
+  text?: string;
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
-  citations?: number[];
+  citations?: Citation[];
   videoUrl?: string;
 }
 
+// /assistant/chat returns citation ids; /clone/chat returns {memory_id, text} objects.
+type RawCitation = number | { memory_id: number; text?: string };
+
 interface ChatResponse {
   reply: string;
-  citations?: number[];
+  citations?: RawCitation[];
+}
+
+function normalizeCitation(c: RawCitation): Citation {
+  return typeof c === "number" ? { memoryId: c } : { memoryId: c.memory_id, text: c.text };
 }
 
 interface ChatProps {
@@ -55,12 +67,7 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
     setError(null);
 
     try {
-      const historyForApi = messages
-        .filter((m) => m.role !== "assistant" || !m.citations)
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+      const historyForApi = messages.map((m) => ({ role: m.role, content: m.content }));
 
       const body: Record<string, unknown> = {
         message: userMessage,
@@ -76,7 +83,7 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
       const assistantMessage: Message = {
         role: "assistant",
         content: response.reply,
-        citations: response.citations || [],
+        citations: (response.citations || []).map(normalizeCitation),
       };
 
       setMessages([
@@ -132,9 +139,10 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
                 <div className="mt-2 text-sm border-t border-opacity-30 pt-2">
                   <p className="font-semibold mb-1">Citations:</p>
                   <ul className="space-y-1">
-                    {msg.citations.map((memoryId, cidx) => (
-                      <li key={cidx} className="text-xs opacity-75">
-                        • Memory {memoryId}
+                    {msg.citations.map((c) => (
+                      <li key={c.memoryId} className="text-xs opacity-75">
+                        • Memory {c.memoryId}
+                        {c.text ? `: ${c.text}` : ""}
                       </li>
                     ))}
                   </ul>
@@ -144,7 +152,8 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
                 <div className="mt-2">
                   <VideoReplyButton
                     text={msg.content}
-                    onVideoReady={(url) => handleVideoReady(idx, url)}
+                    // mp4_url is a backend path, so resolve it against the API origin
+                    onVideoReady={(url) => handleVideoReady(idx, getApiUrl(url))}
                   />
                 </div>
               )}
