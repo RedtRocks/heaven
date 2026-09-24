@@ -84,4 +84,3 @@ def get_face(settings: Settings | None = None) -> FaceRenderer:
 
         return StillPhotoFaceRenderer(s)
     raise ValueError(f"Unknown FACE_PROVIDER: {s.face_provider!r}")
->>>>>>> main
