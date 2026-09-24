@@ -39,7 +39,7 @@ Secret so a leaked URL alone isn't enough to use your GPU minutes.
    modal secret create keepsake-voice-secret VOICE_SHARED_SECRET=<the token you generated>
    ```
    You can also do this from the Modal dashboard under Secrets.
-3. Keep that token — you'll put it in `backend/.env` as `MODAL_VOICE_TOKEN` in step 4.
+3. Keep that token — you'll put it in `.env` at the repo root (the backend reads it from there) as `MODAL_VOICE_TOKEN` in step 4.
 
 ## 3. Deploy
 
@@ -66,7 +66,7 @@ Redeploying (after editing `app.py`) reuses the same app name and URL.
 
 ## 4. Point the backend at it
 
-In `backend/.env` (copy from `.env.example` if you haven't):
+In `.env` at the repo root (the backend reads it from there) (copy from `.env.example` if you haven't):
 
 ```
 VOICE_PROVIDER=modal
