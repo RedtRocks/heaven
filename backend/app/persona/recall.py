@@ -1,17 +1,16 @@
 """Where the Clone gets its Memories from.
 
-The archive module (built in parallel, in another worktree) will provide the
-real MemoryRecall. Until it's wired in, the Clone gets no Memories at all
-rather than importing anything from the archive directly.
+Backed by the archive module's ArchiveMemoryRecall: embeds the query, does a pgvector
+search, then filters through app.visibility.can_see for the given Visitor before
+anything reaches the Clone's prompt (see docs/agents/task-memory.md section 3).
 """
 
-from app.conversation.contracts import MemoryRecall, RecalledMemory
+from sqlalchemy.orm import Session
+
+from app.archive.recall import ArchiveMemoryRecall
+from app.conversation.contracts import MemoryRecall
+from app.providers.registry import get_embedder
 
 
-class _NullMemoryRecall:
-    def recall(self, query: str, visitor_id: int | None, k: int = 8) -> list[RecalledMemory]:
-        return []
-
-
-def get_memory_recall() -> MemoryRecall:
-    return _NullMemoryRecall()
+def get_memory_recall(session: Session) -> MemoryRecall:
+    return ArchiveMemoryRecall(session, get_embedder())
