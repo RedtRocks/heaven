@@ -1,0 +1,18 @@
+diff --git a/modules/talkinghead.mjs b/modules/talkinghead.mjs
+index 441ddff6b01d05093a244441f77c60ffead695e8..e006680e9f6648d73405b2027933254bcb5f835e 100644
+--- a/modules/talkinghead.mjs
++++ b/modules/talkinghead.mjs
+@@ -2746,11 +2746,11 @@ class TalkingHead {
+   * @param {string} lang Language
+   * @param {string} [path="./"] Module path
+   */
+-  lipsyncGetProcessor(lang, path="./") {
++  lipsyncGetProcessor(lang, path="/talkinghead-modules/") {
+     if ( !this.lipsync.hasOwnProperty(lang) ) {
+       const moduleName = path + 'lipsync-' + lang.toLowerCase() + '.mjs';
+       const className = 'Lipsync' + lang.charAt(0).toUpperCase() + lang.slice(1);
+-      import(moduleName).then( module => {
++      import(/* webpackIgnore: true */ /* turbopackIgnore: true */ moduleName).then( module => {
+         this.lipsync[lang] = new module[className];
+       });
+     }
