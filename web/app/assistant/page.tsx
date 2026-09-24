@@ -1,13 +1,9 @@
-import Chat from "@/components/Chat";
+import AssistantLive from "@/components/AssistantLive";
 
 export const metadata = {
   title: "Memory Assistant - Keepsake",
 };
 
 export default function AssistantPage() {
-  return (
-    <div className="h-screen">
-      <Chat endpoint="/assistant/chat" />
-    </div>
-  );
+  return <AssistantLive />;
 }

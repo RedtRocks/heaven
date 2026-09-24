@@ -55,3 +55,10 @@ export async function patch<T>(
 export function getApiUrl(path: string): string {
   return new URL(path, API_URL).toString();
 }
+
+/** Same host as the HTTP API, but ws:// or wss:// - for the live mode WebSocket. */
+export function getWsUrl(path: string): string {
+  const url = new URL(path, API_URL);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}

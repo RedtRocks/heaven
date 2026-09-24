@@ -5,7 +5,7 @@ no matter how the calling code obtained the provider.
 """
 
 from app.config import Settings, get_settings
-from app.providers import LLM, Embedder, FaceRenderer, SpeechToText, VoiceSynth
+from app.providers import LLM, Embedder, FaceRenderer, LiveVoiceSession, SpeechToText, VoiceSynth
 
 _overrides: dict[str, object] = {}
 
@@ -86,6 +86,27 @@ def get_voice(settings: Settings | None = None) -> VoiceSynth:
         else:
             _voice_singleton = local
     return _voice_singleton
+
+
+async def get_live(
+    system_instruction: str, tools: list[dict], settings: Settings | None = None
+) -> LiveVoiceSession:
+    """Opens and returns a connected LiveVoiceSession. Memory Assistant only (ADR 0003)."""
+    if "live" in _overrides:
+        session = _overrides["live"]
+        if callable(session) and not hasattr(session, "send_audio"):
+            return await session(system_instruction, tools)  # type: ignore[misc]
+        return session  # type: ignore[return-value]
+    s = settings or get_settings()
+    from app.providers.live_gemini import GeminiLiveSession
+
+    return await GeminiLiveSession.connect(
+        api_key=s.gemini_api_key,
+        model=s.live_model,
+        voice=s.live_voice,
+        system_instruction=system_instruction,
+        tools=tools,
+    )
 
 
 def get_face(settings: Settings | None = None) -> FaceRenderer:

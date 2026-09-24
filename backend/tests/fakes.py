@@ -9,11 +9,12 @@ recording calls for assertion. Example:
 """
 
 import hashlib
+from collections.abc import AsyncIterator
 from datetime import date
 from typing import Callable
 
 from app.conversation.contracts import MemoryRecall, RecalledMemory
-from app.providers import ChatMessage, Embedder, FaceRenderer, LLM, SpeechToText, VoiceSynth
+from app.providers import ChatMessage, Embedder, FaceRenderer, LiveEvent, LLM, SpeechToText, VoiceSynth
 
 
 class FakeLLM:
@@ -249,3 +250,50 @@ class FakeMemoryRecall:
         # Simple substring matching for determinism (tests can set specific memories)
         matching = [m for m in self._memories if query.lower() in m.text.lower()]
         return matching[:k]
+
+
+class FakeLiveSession:
+    """LiveVoiceSession that plays back a scripted list of LiveEvents.
+
+    Usage:
+        session = FakeLiveSession(events=[LiveToolCall(...), LiveAudioChunk(...)])
+        async for event in session.receive():
+            ...
+        session.audio_sent  # bytes passed to send_audio, concatenated
+        session.tool_results  # [(call_id, result), ...]
+    """
+
+    def __init__(self, events: list[LiveEvent] | None = None):
+        self._events = events or []
+        self.audio_sent = b""
+        self.tool_results: list[tuple[str, object]] = []
+        self.closed = False
+        self.calls: list[dict] = []
+
+    async def send_audio(self, pcm: bytes) -> None:
+        self.calls.append({"send_audio": pcm})
+        self.audio_sent += pcm
+
+    async def send_tool_result(self, call_id: str, result: object) -> None:
+        self.calls.append({"send_tool_result": (call_id, result)})
+        self.tool_results.append((call_id, result))
+
+    async def receive(self) -> AsyncIterator[LiveEvent]:
+        for event in self._events:
+            yield event
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def fake_live_factory(session: "FakeLiveSession"):
+    """Wraps a FakeLiveSession so it can be used as a `live` registry override: the
+    registry calls `await get_live(system_instruction, tools)`, so the override must be
+    an async callable, not the session itself."""
+
+    async def factory(system_instruction: str, tools: list[dict]) -> "FakeLiveSession":
+        factory.system_instruction = system_instruction  # type: ignore[attr-defined]
+        factory.tools = tools  # type: ignore[attr-defined]
+        return session
+
+    return factory
