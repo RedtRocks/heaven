@@ -40,6 +40,7 @@ run_step "backend pytest" "cd backend && uv run pytest -q"
 # Web tests (only if web/package.json exists)
 if [ -f "web/package.json" ]; then
     run_step "web lint" "cd web && pnpm lint"
+    run_step "web unit tests" "cd web && pnpm test"
     run_step "web build" "cd web && pnpm build"
 else
     echo -e "${YELLOW}Skipping web tests (web/package.json not found)${RESET}\n"

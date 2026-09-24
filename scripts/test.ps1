@@ -70,6 +70,17 @@ if (Test-Path "web/package.json") {
     }
     $all_passed = $all_passed -and $lint_passed
 
+    $web_test_passed = Run-Step "web unit tests" {
+        Push-Location web
+        try {
+            pnpm test
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    $all_passed = $all_passed -and $web_test_passed
+
     $build_passed = Run-Step "web build" {
         Push-Location web
         try {
