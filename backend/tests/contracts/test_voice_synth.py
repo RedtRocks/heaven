@@ -5,6 +5,7 @@ Any class implementing the VoiceSynth protocol must pass these tests.
 
 from pathlib import Path
 
+import httpx
 import pytest
 
 from app.providers import VoiceSynth
@@ -17,6 +18,12 @@ try:
 except ImportError:
     HAS_CHATTERBOX = False
 
+# A minimal but valid WAV: RIFF/WAVE header, fmt chunk, empty data chunk.
+_MINIMAL_WAV = (
+    b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00"
+    b"\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+)
+
 
 def _make_chatterbox():
     from app.providers.tts_chatterbox import ChatterboxVoiceSynth
@@ -24,6 +31,24 @@ def _make_chatterbox():
     # No reference clip needed for the contract test: ChatterboxVoiceSynth falls back to
     # the model's default voice when the reference path doesn't exist.
     return ChatterboxVoiceSynth(Path("does-not-exist.wav"))
+
+
+def _make_modal_voice_synth():
+    from app.providers.tts_modal import ModalVoiceSynth
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_MINIMAL_WAV)
+
+    # Real HTTP semantics (headers, JSON body, status handling) via a fake transport - no
+    # real Modal endpoint is reachable from this environment. See
+    # backend/tests/test_tts_modal.py for the fuller unit tests (auth header, timeouts,
+    # fallback behaviour).
+    return ModalVoiceSynth(
+        "https://example.modal.run/speak",
+        "token",
+        Path("does-not-exist.wav"),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
 
 
 @pytest.fixture(
@@ -37,6 +62,7 @@ def _make_chatterbox():
             ],
             id="ChatterboxVoiceSynth",
         ),
+        pytest.param(_make_modal_voice_synth, id="ModalVoiceSynth"),
     ]
 )
 def voice_synth_provider(request):
