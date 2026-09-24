@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  '@met4citizen/talkinghead@1.7.0': 6e24bab01f484045e540542cfdc4549761237c147235814f4e4c4ffe07b3f790
+  '@met4citizen/talkinghead@1.7.0': eebc4236580730978342544eabe4a1df57704d6749a5c3b34975116c6f70009e
 
 importers:
 
@@ -13,7 +13,7 @@ importers:
     dependencies:
       '@met4citizen/talkinghead':
         specifier: ^1.7.0
-        version: 1.7.0(patch_hash=6e24bab01f484045e540542cfdc4549761237c147235814f4e4c4ffe07b3f790)
+        version: 1.7.0(patch_hash=eebc4236580730978342544eabe4a1df57704d6749a5c3b34975116c6f70009e)
       next:
         specifier: 16.3.6
         version: 16.3.6(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2687,7 +2687,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@met4citizen/talkinghead@1.7.0(patch_hash=6e24bab01f484045e540542cfdc4549761237c147235814f4e4c4ffe07b3f790)':
+  '@met4citizen/talkinghead@1.7.0(patch_hash=eebc4236580730978342544eabe4a1df57704d6749a5c3b34975116c6f70009e)':
     dependencies:
       three: 0.180.0
 
