@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/*, bugfix/*, docs/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: keepsake
+          POSTGRES_PASSWORD: keepsake
+          POSTGRES_DB: keepsake
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create test database
+        env:
+          PGPASSWORD: keepsake
+        run: |
+          psql -h localhost -U keepsake -d keepsake -c "CREATE DATABASE test_test_infra;" || true
+          psql -h localhost -U keepsake -d test_test_infra -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
+        continue-on-error: true
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://keepsake:keepsake@localhost:5433/test_test_infra
+        run: uv run pytest -q
+
+  web-tests:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    if: hashFiles('web/package.json') != ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install
+
+      - name: Run lint
+        working-directory: web
+        run: pnpm lint
+
+      - name: Run build
+        working-directory: web
+        run: pnpm build
