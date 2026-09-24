@@ -58,7 +58,12 @@ _voice_singleton: VoiceSynth | None = None
 
 
 def get_voice(settings: Settings | None = None) -> VoiceSynth:
-    """Cached across calls: Chatterbox's model is slow to load, so we load it once."""
+    """Cached across calls: Chatterbox's model is slow to load, so we load it once.
+
+    VOICE_PROVIDER=local (default): Chatterbox-Nano on this machine's CPU.
+    VOICE_PROVIDER=modal: Chatterbox on a Modal GPU (docs/notes/modal-voice-setup.md),
+        falling back to local Chatterbox-Nano if the Modal endpoint fails or times out.
+    """
     if "voice" in _overrides:
         return _overrides["voice"]  # type: ignore[return-value]
     global _voice_singleton
@@ -67,7 +72,19 @@ def get_voice(settings: Settings | None = None) -> VoiceSynth:
         from app.providers.tts_chatterbox import ChatterboxVoiceSynth
 
         reference_path = s.likeness_dir / "voice" / "reference.wav"
-        _voice_singleton = ChatterboxVoiceSynth(reference_path)
+        local = ChatterboxVoiceSynth(reference_path)
+        if s.voice_provider == "modal":
+            from app.providers.tts_modal import FallbackVoiceSynth, ModalVoiceSynth
+
+            modal = ModalVoiceSynth(
+                s.modal_voice_url,
+                s.modal_voice_token,
+                reference_path,
+                timeout_seconds=s.modal_voice_timeout_seconds,
+            )
+            _voice_singleton = FallbackVoiceSynth(modal, local)
+        else:
+            _voice_singleton = local
     return _voice_singleton
 
 

@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # /voice/speak isn't a ~50 s wait. Off by default so tests never load the model.
     voice_warmup: bool = False
 
+    # "local" (Chatterbox-Nano on CPU, ~2x real time) or "modal" (Chatterbox on a Modal
+    # GPU, see docs/notes/modal-voice-setup.md). Modal falls back to local on any failure.
+    voice_provider: str = "local"
+    modal_voice_url: str = ""  # e.g. https://<workspace>--keepsake-voice-speak.modal.run
+    modal_voice_token: str = ""  # shared secret, sent as the Authorization header
+    modal_voice_timeout_seconds: float = 30.0
+
     # Local files holding the Owner's Likeness (voice clips, face assets). Never committed.
     likeness_dir: Path = REPO_ROOT / "likeness"
 
