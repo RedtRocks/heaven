@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function AssistantPage() {
   return (
-    <div>
+    <div className="h-screen">
       <Chat endpoint="/assistant/chat" />
     </div>
   );

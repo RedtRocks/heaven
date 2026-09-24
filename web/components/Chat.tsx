@@ -32,9 +32,12 @@ interface ChatProps {
   endpoint: string;
   visitorId?: number;
   enableVideo?: boolean;
+  /** Called with the assistant's reply text whenever a new one arrives, e.g. to
+   * drive the 3D face on /clone. /assistant doesn't pass this, so it's unaffected. */
+  onAssistantReply?: (text: string) => void;
 }
 
-export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
+export default function Chat({ endpoint, visitorId, enableVideo, onAssistantReply }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,6 +94,7 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
         { role: "user", content: userMessage },
         assistantMessage,
       ]);
+      onAssistantReply?.(assistantMessage.content);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to send message"
@@ -102,7 +106,7 @@ export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white dark:bg-slate-900">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
