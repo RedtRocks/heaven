@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import create_all, get_session
+from app.people import models as _people_models  # noqa: F401  (registers tables)
 from app.providers import ChatMessage
 from app.providers.registry import get_llm
 

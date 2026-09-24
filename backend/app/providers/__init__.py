@@ -14,6 +14,12 @@ class LLM(Protocol):
     def complete(self, messages: list[ChatMessage], system: str | None = None) -> str: ...
 
 
+class Embedder(Protocol):
+    dimensions: int
+
+    def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+
 class SpeechToText(Protocol):
     def transcribe(self, audio: bytes, filename: str = "audio.wav") -> str: ...
 
