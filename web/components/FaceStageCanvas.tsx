@@ -10,7 +10,7 @@ import {
 import { TalkingHead } from "@met4citizen/talkinghead";
 import { Lipsync } from "wawa-lipsync";
 import { getApiUrl } from "@/lib/api";
-import { estimateWordTimings, isVoiceUnavailableStatus } from "@/lib/faceSpeech";
+import { estimateWordTimings, isVoiceUnavailableStatus, splitSentences } from "@/lib/faceSpeech";
 
 export interface FaceStageHandle {
   /** Make the face speak `text`. Safe to call even if the avatar failed to load. */
@@ -173,8 +173,9 @@ const FaceStageCanvas = forwardRef<FaceStageHandle>(function FaceStageCanvas(
     }
   }
 
-  /** Real audio path: play the WAV ourselves and drive visemes from its waveform. */
-  function speakWithAudio(arrayBuffer: ArrayBuffer) {
+  /** Real audio path: play the WAV ourselves and drive visemes from its waveform.
+   * Resolves when playback ends (or fails), so sentences can be chained. */
+  function speakWithAudio(arrayBuffer: ArrayBuffer): Promise<void> {
     stopLipsyncLoop();
     audioElRef.current?.pause();
 
@@ -189,18 +190,25 @@ const FaceStageCanvas = forwardRef<FaceStageHandle>(function FaceStageCanvas(
     }
     lipsyncRef.current.connectAudio(audioEl);
 
-    audioEl.addEventListener("ended", () => {
-      stopLipsyncLoop();
-      URL.revokeObjectURL(url);
+    return new Promise((resolve) => {
+      const finish = () => {
+        stopLipsyncLoop();
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audioEl.addEventListener("ended", finish);
+      // Pausing (a newer reply took over) also ends this sentence.
+      audioEl.addEventListener("pause", finish);
+      audioEl
+        .play()
+        .then(() => {
+          rafRef.current = requestAnimationFrame(driveVisemesFromAudio);
+        })
+        .catch((err) => {
+          console.error("Failed to play speech audio:", err);
+          finish();
+        });
     });
-    audioEl
-      .play()
-      .then(() => {
-        rafRef.current = requestAnimationFrame(driveVisemesFromAudio);
-      })
-      .catch((err) => {
-        console.error("Failed to play speech audio:", err);
-      });
   }
 
   /** Fallback path: no server audio, so drive the mouth from estimated word timing
@@ -230,29 +238,43 @@ const FaceStageCanvas = forwardRef<FaceStageHandle>(function FaceStageCanvas(
     });
   }
 
+  /** Fetch one sentence's audio. Resolves to null when the voice isn't set up. */
+  async function fetchSentenceAudio(sentence: string): Promise<ArrayBuffer | null> {
+    const res = await fetch(getApiUrl("/voice/speak"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: sentence }),
+    });
+    if (isVoiceUnavailableStatus(res.status)) return null;
+    if (!res.ok) throw new Error(`voice/speak returned ${res.status}`);
+    return res.arrayBuffer();
+  }
+
+  // Bumped on every speak() call, so an older reply stops once a newer one starts.
+  const speechIdRef = useRef(0);
+
   async function speak(text: string) {
     if (avatarStatus !== "ready" || !text.trim()) return;
+    const speechId = ++speechIdRef.current;
+    const sentences = splitSentences(text);
 
     try {
-      const res = await fetch(getApiUrl("/voice/speak"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (isVoiceUnavailableStatus(res.status)) {
-        setVoiceNotSetUp(true);
-        speakSilently(text);
-        return;
+      // Synthesis is slower than playback on CPU, so request sentence i+1 while i plays.
+      let pending = fetchSentenceAudio(sentences[0]);
+      for (let i = 0; i < sentences.length; i++) {
+        const audio = await pending;
+        if (speechId !== speechIdRef.current) return;
+        if (audio === null) {
+          setVoiceNotSetUp(true);
+          speakSilently(sentences.slice(i).join(" "));
+          return;
+        }
+        setVoiceNotSetUp(false);
+        if (i + 1 < sentences.length) pending = fetchSentenceAudio(sentences[i + 1]);
+        await speakWithAudio(audio);
       }
-      if (!res.ok) {
-        throw new Error(`voice/speak returned ${res.status}`);
-      }
-
-      setVoiceNotSetUp(false);
-      const arrayBuffer = await res.arrayBuffer();
-      speakWithAudio(arrayBuffer);
     } catch (err) {
+      if (speechId !== speechIdRef.current) return;
       console.warn("voice/speak unavailable, falling back to silent lip-sync:", err);
       setVoiceNotSetUp(true);
       speakSilently(text);

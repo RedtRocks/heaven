@@ -12,6 +12,32 @@ export function isVoiceUnavailableStatus(status: number): boolean {
   return VOICE_UNAVAILABLE_STATUSES.has(status);
 }
 
+/**
+ * Split a reply into sentences so the face can start speaking after the first one is
+ * synthesised. Voice synthesis runs ~2x slower than real time on the Owner's CPU, so
+ * waiting for the whole reply would mean a long silence first. Very short fragments are
+ * merged into the previous sentence to avoid choppy one-word requests.
+ */
+export function splitSentences(text: string, minChars = 12): string[] {
+  const parts = text.match(/[^.!?…]+[.!?…]+["')\]]*|[^.!?…]+$/g) ?? [];
+  const sentences: string[] = [];
+  let carry = ""; // a short opener ("Hey!") waiting to join the next sentence
+  for (const raw of parts) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (s.length < minChars && sentences.length > 0 && !carry) {
+      sentences[sentences.length - 1] += " " + s;
+    } else if (s.length < minChars && sentences.length === 0) {
+      carry = carry ? `${carry} ${s}` : s;
+    } else {
+      sentences.push(carry ? `${carry} ${s}` : s);
+      carry = "";
+    }
+  }
+  if (carry) sentences.push(carry);
+  return sentences;
+}
+
 export interface WordTiming {
   words: string[];
   wtimes: number[];

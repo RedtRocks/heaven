@@ -86,3 +86,17 @@ model, once cached, doesn't need to re-download.
 - **Nano is on GitHub main.** Installing `chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git` exposes `ChatterboxTurboTTS.from_pretrained("cpu", nano=True)` (repo `ResembleAI/chatterbox-nano`, GPT2-small backbone). The weights download worked (≈33 min on this connection) and are now in the local Hugging Face cache.
 - **Loading Nano also segfaulted (exit 139)**, with only **0.1 GB of RAM free** at load time. The standard model crashed the same way earlier at 0.8–1.4 GB free. Most of the 13.9 GB was held by desktop apps (browser ~3.3 GB, VS Code ~1.1 GB, WebView ~0.7 GB) plus memory compression, so **free RAM is the blocker, not the code.**
 - **Next step:** close the browser, then run `scratchpad`-style `bench.py` against Nano (or `scripts/bench_voice.py` after switching the provider). If Nano loads and runs near real time, switch `tts_chatterbox.py` to `ChatterboxTurboTTS(..., nano=True)` and pin the git dependency to a commit.
+
+## Measured, 2026-09-24 (coordinator, with ~5 GB RAM free)
+
+Chatterbox-**Nano** (`ChatterboxTurboTTS.from_pretrained("cpu", nano=True)`, git commit `5de7a54`), Ryzen 5 7530U:
+
+| | 12 threads | 6 threads (default now) |
+|---|---|---|
+| Load | 12.7 s, 2.3 GB RSS | 9.1 s, 2.3 GB RSS |
+| First sentence (cold) | 26.0 s for 2.4 s audio | 7.4 s for 2.6 s audio |
+| Steady state RTF | ~2.1 | ~2.1–2.2 |
+
+- **Not real time on CPU:** a ~3.5 s sentence takes ~7 s. The standard (non-Nano) model can't load at all with this much RAM.
+- **Mitigations in place:** the face speaks sentence by sentence and fetches the next sentence while the current one plays (first audio ~6.6 s after the reply arrives, measured in the browser). `VOICE_WARMUP=1` loads and warms the model at startup, so the first request drops from ~54 s to ~6 s.
+- **To get real time later:** a GPU (paid), or a faster non-cloned TTS for the live path.

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # How many days ahead the Release Digest looks for Memories about to release.
     digest_window_days: int = 3
 
+    # Load and warm the voice model in the background at startup, so the first
+    # /voice/speak isn't a ~50 s wait. Off by default so tests never load the model.
+    voice_warmup: bool = False
+
     # Local files holding the Owner's Likeness (voice clips, face assets). Never committed.
     likeness_dir: Path = REPO_ROOT / "likeness"
 

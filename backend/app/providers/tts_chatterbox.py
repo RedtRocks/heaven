@@ -1,32 +1,25 @@
-"""Voice clone via Resemble AI's Chatterbox (MIT, https://github.com/resemble-ai/chatterbox).
+"""Voice clone via Resemble AI's Chatterbox-Nano (MIT, https://github.com/resemble-ai/chatterbox).
 
-Chatterbox-Nano (110M params) is the CPU-oriented member of the family the task asked
-for, loaded via `ChatterboxTurboTTS.from_pretrained(device="cpu", nano=True)` per the
-GitHub README. In practice, the released PyPI package (`chatterbox-tts==0.1.7`, the
-latest available at the time this was written) does NOT support `nano=True` yet:
-`ChatterboxTurboTTS.from_pretrained` takes only `device`, and hardcodes
-`REPO_ID = "ResembleAI/chatterbox-turbo"` — Nano support is on GitHub's default branch
-but not released to PyPI. So this uses the standard `ChatterboxTTS` (`chatterbox.tts`,
-the original "English" model, `REPO_ID = "ResembleAI/chatterbox"`), which the README
-also describes as CPU-capable and is the closest real option installable from PyPI.
-Swap in Nano here once a release adds it — `generate()`/`audio_prompt_path` is the same
-API either way.
+Nano (GPT2-small backbone) is the CPU-oriented member of the family. It is only on the
+GitHub branch, not in the PyPI release, so pyproject pins a git commit. Measured on the
+Owner's Ryzen 5 7530U (docs/notes/voice.md): loads in ~9 s using ~2.5 GB RAM, and
+synthesises at ~2.1x real time (a 3.4 s sentence takes ~7 s) with 6 threads.
 
 Vendor imports (chatterbox, torch, torchaudio) happen only inside methods, so this
-module — and `get_voice()` — can be imported even when the optional `voice` dependency
-group isn't installed; only actually synthesising speech requires it.
+module, and `get_voice()`, can be imported without the optional `voice` extra.
 """
 
 import io
+import os
 from pathlib import Path
+
+# Physical cores beat logical ones for this workload (measured: 6 threads cold-starts in
+# 7 s vs 26 s with 12).
+_THREADS = int(os.environ.get("VOICE_THREADS", "6"))
 
 
 class ChatterboxVoiceSynth:
-    """Speaks text in the Owner's cloned voice using Chatterbox, on CPU.
-
-    The model is loaded lazily on first `speak()` call, once, and kept for the life of
-    this instance — loading it takes several seconds.
-    """
+    """Speaks text in the Owner's cloned voice on CPU. The model loads once, on first use."""
 
     def __init__(self, reference_wav_path: Path):
         self._reference_wav_path = reference_wav_path
@@ -34,9 +27,11 @@ class ChatterboxVoiceSynth:
 
     def _model_instance(self):
         if self._model is None:
-            from chatterbox.tts import ChatterboxTTS
+            import torch
+            from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-            self._model = ChatterboxTTS.from_pretrained(device="cpu")
+            torch.set_num_threads(_THREADS)
+            self._model = ChatterboxTurboTTS.from_pretrained("cpu", nano=True)
         return self._model
 
     def speak(self, text: str) -> bytes:

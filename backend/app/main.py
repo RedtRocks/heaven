@@ -1,3 +1,5 @@
+import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.archive import models as _archive_models  # noqa: F401  (registers tables)
 from app.archive.api import router as archive_router
+from app.config import get_settings
 from app.db import create_all, get_session
 from app.face import models as _face_models  # noqa: F401  (registers tables)
 from app.face.api import router as face_router
@@ -15,14 +18,24 @@ from app.people import models as _people_models  # noqa: F401  (registers tables
 from app.persona import models as _persona_models  # noqa: F401  (registers tables)
 from app.persona.api import router as persona_router
 from app.providers import ChatMessage
-from app.providers.registry import get_llm
+from app.providers.registry import get_llm, get_voice
 from app.voice.api import router as voice_router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     create_all()
+    if get_settings().voice_warmup:
+        threading.Thread(target=_warm_voice, daemon=True).start()
     yield
+
+
+def _warm_voice() -> None:
+    try:
+        get_voice().speak("Hello.")
+        logging.getLogger("uvicorn.error").info("Voice model warmed up")
+    except Exception:
+        logging.getLogger("uvicorn.error").exception("Voice warm-up failed; /voice/speak will load on first use")
 
 
 app = FastAPI(title="Keepsake", lifespan=lifespan)

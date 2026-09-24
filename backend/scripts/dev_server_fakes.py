@@ -6,6 +6,7 @@ Uses the real local database, but every LLM/STT/embedding/voice/face call return
 output from tests/fakes.py. Never use this for real Memories.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -28,13 +29,17 @@ CANNED_REPLY = (
     "we kept planning and never took. We should still do it, you know."
 )
 
-registry.override(
+fakes = dict(
     llm=FakeLLM(reply=CANNED_REPLY),
     stt=FakeSpeechToText(text="Today I finally finished the project and felt proud."),
     embedder=FakeEmbedder(),
     voice=FakeVoiceSynth(),
     face=FakeFaceRenderer(),
 )
+# REAL_VOICE=1 keeps the real Chatterbox voice (needs `uv sync --extra voice`).
+if os.environ.get("REAL_VOICE") == "1":
+    del fakes["voice"]
+registry.override(**fakes)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

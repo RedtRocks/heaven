@@ -40,3 +40,6 @@ markers = [
     "live: tests that call real APIs (skipped unless RUN_LIVE=1)",
 ]
 addopts = "-m 'not slow'"
+
+[tool.uv.sources]
+chatterbox-tts = { git = "https://github.com/resemble-ai/chatterbox.git", rev = "5de7a54aa4e5e2baadb0182dde554908b48b85c2" }
