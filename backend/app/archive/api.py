@@ -26,18 +26,19 @@ router = APIRouter(prefix="", tags=["archive"])
 AUDIO_ENTRIES_DIR = REPO_ROOT / "data" / "audio"
 
 
-# Thin wrappers around the registry so tests can override providers via FastAPI's
-# app.dependency_overrides (overriding get_llm/get_embedder/get_stt directly wouldn't
-# work, since FastAPI only intercepts calls that go through Depends()).
-def llm_dependency() -> LLM:
+# get_llm/get_embedder/get_stt take an optional `settings` argument for tests outside
+# FastAPI. Passed straight to Depends(), FastAPI would try to resolve `settings` itself
+# (as a request body field, since Settings is a pydantic model). These no-arg wrappers
+# are what routes actually depend on (see app/persona/api.py for the same pattern).
+def _get_llm() -> LLM:
     return get_llm()
 
 
-def embedder_dependency() -> Embedder:
+def _get_embedder() -> Embedder:
     return get_embedder()
 
 
-def stt_dependency() -> SpeechToText:
+def _get_stt() -> SpeechToText:
     return get_stt()
 
 
@@ -90,8 +91,8 @@ def _memory_out(memory: Memory) -> MemoryOut:
 def create_entry(
     body: EntryCreate,
     session: Session = Depends(get_session),
-    llm: LLM = Depends(llm_dependency),
-    embedder: Embedder = Depends(embedder_dependency),
+    llm: LLM = Depends(_get_llm),
+    embedder: Embedder = Depends(_get_embedder),
 ) -> EntryOut:
     entry, memories = create_entry_and_memories(session, body.text, llm, embedder)
     return EntryOut(entry_id=entry.id, memories=[_memory_out(m) for m in memories])
@@ -101,9 +102,9 @@ def create_entry(
 def create_entry_from_audio(
     file: UploadFile,
     session: Session = Depends(get_session),
-    llm: LLM = Depends(llm_dependency),
-    embedder: Embedder = Depends(embedder_dependency),
-    stt: SpeechToText = Depends(stt_dependency),
+    llm: LLM = Depends(_get_llm),
+    embedder: Embedder = Depends(_get_embedder),
+    stt: SpeechToText = Depends(_get_stt),
 ) -> EntryOut:
     audio_bytes = file.file.read()
     text = stt.transcribe(audio_bytes, filename=file.filename or "audio.wav")
@@ -135,7 +136,7 @@ def patch_memory(
     memory_id: int,
     body: MemoryPatch,
     session: Session = Depends(get_session),
-    embedder: Embedder = Depends(embedder_dependency),
+    embedder: Embedder = Depends(_get_embedder),
 ) -> MemoryOut:
     memory = session.get(Memory, memory_id)
     if memory is None:
@@ -203,8 +204,8 @@ _CITATION_RE = re.compile(r"\[Memory (\d+)\]")
 def assistant_chat(
     body: AssistantChatRequest,
     session: Session = Depends(get_session),
-    llm: LLM = Depends(llm_dependency),
-    embedder: Embedder = Depends(embedder_dependency),
+    llm: LLM = Depends(_get_llm),
+    embedder: Embedder = Depends(_get_embedder),
 ) -> AssistantChatResponse:
     """The Memory Assistant: the Owner talking to their own full archive (visitor_id=None)."""
 

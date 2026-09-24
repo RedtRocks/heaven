@@ -1,5 +1,6 @@
 """create_entry_and_memories: the DB-touching glue between an Entry and its Memories."""
 
+import json
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -9,11 +10,15 @@ from app.archive.service import create_entry_and_memories
 from app.config import get_settings
 from app.people.models import Person
 
-from .fakes import FakeEmbedder, FakeLLM, memories_payload
+from .fakes import FakeEmbedder, FakeLLM
+
+
+def memories_payload(*memories: dict) -> str:
+    return json.dumps({"memories": list(memories)})
 
 
 def test_creates_entry_and_memories_with_new_person_and_embedding(db_session):
-    llm = FakeLLM(memories_payload({"text": "Met Zoya for coffee.", "participants": ["Zoya"]}))
+    llm = FakeLLM(reply=memories_payload({"text": "Met Zoya for coffee.", "participants": ["Zoya"]}))
     embedder = FakeEmbedder()
 
     entry, memories = create_entry_and_memories(db_session, "Met Zoya for coffee.", llm, embedder)
@@ -34,7 +39,7 @@ def test_reuses_existing_person_instead_of_creating_a_duplicate(db_session):
     db_session.add(riya)
     db_session.flush()
 
-    llm = FakeLLM(memories_payload({"text": "Talked to didi.", "participants": ["didi"]}))
+    llm = FakeLLM(reply=memories_payload({"text": "Talked to didi.", "participants": ["didi"]}))
     embedder = FakeEmbedder()
 
     entry, memories = create_entry_and_memories(db_session, "Talked to didi.", llm, embedder)
@@ -47,7 +52,7 @@ def test_reuses_existing_person_instead_of_creating_a_duplicate(db_session):
 
 
 def test_release_at_is_created_at_plus_holding_period(db_session):
-    llm = FakeLLM(memories_payload({"text": "A quiet day."}))
+    llm = FakeLLM(reply=memories_payload({"text": "A quiet day."}))
     embedder = FakeEmbedder()
 
     entry, memories = create_entry_and_memories(db_session, "A quiet day.", llm, embedder)
@@ -58,7 +63,7 @@ def test_release_at_is_created_at_plus_holding_period(db_session):
 
 
 def test_sensitive_category_auto_seals(db_session):
-    llm = FakeLLM(memories_payload({"text": "Doctor visit.", "sensitive_category": "health"}))
+    llm = FakeLLM(reply=memories_payload({"text": "Doctor visit.", "sensitive_category": "health"}))
     embedder = FakeEmbedder()
 
     _, memories = create_entry_and_memories(db_session, "Doctor visit.", llm, embedder)
@@ -70,7 +75,7 @@ def test_sensitive_category_auto_seals(db_session):
 
 def test_one_entry_can_produce_multiple_memories_each_stored_separately(db_session):
     llm = FakeLLM(
-        memories_payload(
+        reply=memories_payload(
             {"text": "Argued with Riya at dinner.", "participants": ["Riya"]},
             {"text": "Texted someone I'm secretly seeing.", "sensitive_category": "romance"},
         )
@@ -89,7 +94,7 @@ def test_one_entry_can_produce_multiple_memories_each_stored_separately(db_sessi
 
 def test_about_person_becomes_a_participant_even_if_not_named_in_participants(db_session):
     llm = FakeLLM(
-        memories_payload(
+        reply=memories_payload(
             {
                 "text": "Rahul is unreliable, ugh.",
                 "participants": [],

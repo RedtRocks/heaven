@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: keepsake
+          POSTGRES_PASSWORD: keepsake
+          POSTGRES_DB: keepsake
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5433:5432
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://keepsake:keepsake@localhost:5433/test_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: Create test database
+        env:
+          PGPASSWORD: keepsake
+        run: |
+          psql -h localhost -p 5433 -U keepsake -d keepsake -c "CREATE DATABASE test_ci;"
+          psql -h localhost -p 5433 -U keepsake -d test_ci -c "CREATE EXTENSION vector;"
+
+      - name: Run pytest
+        working-directory: backend
+        run: uv run pytest -q
+
+  web-tests:
+    name: Web lint and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for web app
+        id: web
+        run: echo "exists=$([ -f web/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: steps.web.outputs.exists == 'true'
+        with:
+          package_json_file: web/package.json
+
+      - uses: actions/setup-node@v4
+        if: steps.web.outputs.exists == 'true'
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install, lint, build
+        if: steps.web.outputs.exists == 'true'
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm build

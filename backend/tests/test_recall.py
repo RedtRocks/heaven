@@ -1,7 +1,10 @@
 """ArchiveMemoryRecall: vector search that never lets a hidden Memory reach a Visitor.
 
-Uses the real local Postgres+pgvector (test_memory database, see conftest.py) with a
-FakeEmbedder so no network calls happen.
+Uses the real local Postgres+pgvector (test_memory database, see conftest.py). The shared
+FakeEmbedder (tests/fakes.py) hashes text to a vector, which is great for "does this embed
+at all" but useless for controlling *ranking* by cosine distance. These tests need exact
+control over which Memory is closest to the query, so they use a small local embedder
+instead - it's a test-only geometry trick, not a second general-purpose fake.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -10,10 +13,30 @@ from app.archive.models import Entry, Memory, MemoryParticipant
 from app.archive.recall import ArchiveMemoryRecall
 from app.people.models import Person
 
-from .fakes import FakeEmbedder, near_vector
-
 PAST = datetime.now(timezone.utc) - timedelta(days=1)
 FUTURE = datetime.now(timezone.utc) + timedelta(days=1)
+DIMENSIONS = 768
+
+
+class _ExactVectorEmbedder:
+    """Embedder whose vectors are pre-registered exactly, for controlling cosine ranking."""
+
+    dimensions = DIMENSIONS
+
+    def __init__(self, vectors: dict[str, list[float]]):
+        self._vectors = vectors
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [self._vectors[t] for t in texts]
+
+
+def near_vector(closeness: float) -> list[float]:
+    """A vector whose cosine distance from `near_vector(0)` grows with `closeness`."""
+
+    vec = [0.0] * DIMENSIONS
+    vec[0] = 1.0
+    vec[1] = closeness
+    return vec
 
 
 def _make_memory(session, entry, text, embedding, **kwargs):
@@ -46,7 +69,7 @@ def test_recall_filters_by_visibility_for_a_visitor_but_not_the_owner(db_session
     db_session.flush()
 
     query_text = "what happened"
-    embedder = FakeEmbedder(vectors={query_text: near_vector(0.0)})
+    embedder = _ExactVectorEmbedder({query_text: near_vector(0.0)})
 
     sealed = _make_memory(db_session, entry, "sealed secret", near_vector(0.1), sealed=True, proposed_visibility="all_visitors")
     private_to_riya = _make_memory(
@@ -79,7 +102,7 @@ def test_recall_overfetches_so_hidden_matches_dont_starve_k(db_session):
     db_session.flush()
 
     query_text = "query"
-    embedder = FakeEmbedder(vectors={query_text: near_vector(0.0)})
+    embedder = _ExactVectorEmbedder({query_text: near_vector(0.0)})
 
     # The 3 closest matches by embedding are all Sealed; only the 4th is visible to Riya.
     # With k=1 and no over-fetch (limit=k), the visible Memory would never be reached.
@@ -105,7 +128,7 @@ def test_said_behind_back_memory_is_never_recalled_for_its_subject(db_session):
     db_session.flush()
 
     query_text = "opinion"
-    embedder = FakeEmbedder(vectors={query_text: near_vector(0.0)})
+    embedder = _ExactVectorEmbedder({query_text: near_vector(0.0)})
     _make_memory(
         db_session,
         entry,

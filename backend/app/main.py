@@ -10,6 +10,8 @@ from app.archive import models as _archive_models  # noqa: F401  (registers tabl
 from app.archive.api import router as archive_router
 from app.db import create_all, get_session
 from app.people import models as _people_models  # noqa: F401  (registers tables)
+from app.persona import models as _persona_models  # noqa: F401  (registers tables)
+from app.persona.api import router as persona_router
 from app.providers import ChatMessage
 from app.providers.registry import get_llm
 
@@ -25,6 +27,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"]
 )
 app.include_router(archive_router)
+app.include_router(persona_router)
 
 
 @app.get("/health")
