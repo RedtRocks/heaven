@@ -18,21 +18,20 @@ export default function TraitsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadTraits = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await get<Trait[]>("/traits");
+        setTraits(data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load traits");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadTraits();
   }, []);
-
-  async function loadTraits() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await get<Trait[]>("/traits");
-      setTraits(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load traits");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function toggleConfirmed(trait: Trait) {
     try {

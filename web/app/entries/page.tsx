@@ -63,7 +63,7 @@ export default function EntriesPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="max-w-2xl mx-auto py-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-          Today's Entry
+          Today&apos;s Entry
         </h1>
         <p className="text-slate-600 dark:text-slate-400 mb-8">
           Write or record what happened today

@@ -21,21 +21,20 @@ export default function DigestPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadDigest = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await get<DigestResponse>("/digest");
+        setDigest(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load digest");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadDigest();
   }, []);
-
-  async function loadDigest() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await get<DigestResponse>("/digest");
-      setDigest(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load digest");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   if (loading) {
     return (

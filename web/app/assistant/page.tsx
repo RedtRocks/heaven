@@ -7,7 +7,7 @@ export const metadata = {
 export default function AssistantPage() {
   return (
     <div>
-      <Chat endpoint="/assistant/chat" useFallback={true} />
+      <Chat endpoint="/assistant/chat" />
     </div>
   );
 }

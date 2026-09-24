@@ -9,13 +9,17 @@ interface Message {
   citations?: number[];
 }
 
+interface ChatResponse {
+  reply: string;
+  citations?: number[];
+}
+
 interface ChatProps {
   endpoint: string;
   visitorId?: number;
-  useFallback?: boolean;
 }
 
-export default function Chat({ endpoint, visitorId, useFallback = true }: ChatProps) {
+export default function Chat({ endpoint, visitorId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,7 +60,7 @@ export default function Chat({ endpoint, visitorId, useFallback = true }: ChatPr
         body.visitor_id = visitorId;
       }
 
-      const response = await post(endpoint, body);
+      const response = await post<ChatResponse>(endpoint, body);
 
       const assistantMessage: Message = {
         role: "assistant",

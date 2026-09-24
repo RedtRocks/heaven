@@ -25,21 +25,20 @@ export default function MemoriesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadMemories = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await get<Memory[]>("/memories");
+        setMemories(data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load memories");
+      } finally {
+        setLoading(false);
+      }
+    };
     loadMemories();
   }, []);
-
-  async function loadMemories() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await get<Memory[]>("/memories");
-      setMemories(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load memories");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function toggleSeal(id: number, sealed: boolean) {
     try {
