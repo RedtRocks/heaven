@@ -10,9 +10,11 @@ You are one of several agents building Keepsake in parallel. Each agent has its 
    - Vendor SDKs (google-genai, openai, groq, chatterbox, etc.) are imported ONLY inside `backend/app/providers/`, behind the Protocols in `backend/app/providers/__init__.py`. Other code gets providers through `backend/app/providers/registry.py`.
    - Shared contracts already exist: `app/people/models.py` (Person), `app/conversation/contracts.py` (MemoryRecall, RecalledMemory), and the Embedder Protocol. Don't change their signatures. If you need something extra, add it in your own module.
    - Postgres + pgvector runs at `127.0.0.1:5433` (see `.env.example`). Tables are created with `Base.metadata.create_all` (no migrations yet).
-   - Tests go in `backend/tests/`, run with `cd backend && uv run pytest -q`. There are NO real API keys. Tests must use fake providers and must pass before you finish.
+   - Tests go in `backend/tests/`, run with `cd backend && uv run pytest -q`. There are NO real API keys. Tests must use fake providers and must pass before you finish. See `docs/testing.md` for the guide.
    - Add dependencies with `uv add`. Heavy ones (torch and so on) go in an optional group: `uv add --optional <group> <pkg>`.
 4. Web app: Next.js + TypeScript in `web/`, using pnpm.
 5. Never commit personal data, audio, video or model weights. `likeness/` and `data/` are gitignored.
 6. When done, write a short report at `docs/agents/reports/<your-branch-name>.md`: what you built, how to run it, what you verified, and what's unverified or left undone. Commit it.
 7. Database tests: use ONLY your own test database, `postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_<branch>` where `<branch>` is your branch name without `feat/` and with `-` replaced by `_` (e.g. `test_memory`). It already exists and has pgvector. You may create and drop tables in it freely. Never touch the `keepsake` database from tests.
+8. Providers in routes: call `registry.get_llm()` (etc.) inside the handler body. Never use `Depends(get_llm)`, because FastAPI treats its `settings` parameter as a request body. Every new `get_<kind>()` in the registry must check `_overrides` first (see `get_llm`). That's how the `client` test fixture swaps in fakes.
+9. Run tests against your own DB: `TEST_DATABASE_URL=postgresql+psycopg://keepsake:keepsake@127.0.0.1:5433/test_<branch> uv run pytest -q`. Use the shared fakes and fixtures in `backend/tests/fakes.py` and `conftest.py` (see docs/testing.md) instead of writing new ones.
