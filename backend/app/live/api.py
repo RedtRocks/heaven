@@ -19,7 +19,14 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.live.recall import MEMORY_ASSISTANT_SYSTEM_PROMPT, RECALL_MEMORIES_TOOL, recall_for_live, recalled_memories_to_tool_result
-from app.providers import LiveAudioChunk, LiveSessionEnded, LiveToolCall, LiveTranscript, LiveTurnComplete
+from app.providers import (
+    LiveAudioChunk,
+    LiveSessionEnded,
+    LiveToolCall,
+    LiveTranscript,
+    LiveTurnComplete,
+    ProviderNotConfigured,
+)
 from app.providers.registry import get_embedder, get_live
 
 logger = logging.getLogger("uvicorn.error")
@@ -33,6 +40,10 @@ async def live_assistant(websocket: WebSocket, db_session: Session = Depends(get
 
     try:
         live = await get_live(system_instruction=MEMORY_ASSISTANT_SYSTEM_PROMPT, tools=[RECALL_MEMORIES_TOOL])
+    except ProviderNotConfigured as e:
+        await websocket.send_json({"type": "error", "message": str(e)})
+        await websocket.close()
+        return
     except Exception:
         logger.exception("Failed to open Gemini Live session")
         await websocket.send_json({"type": "error", "message": "Couldn't start live mode. Try again shortly."})

@@ -94,6 +94,10 @@ export default function LiveTalk({ onTranscript, onEnded }: LiveTalkProps) {
   const start = useCallback(async () => {
     setError(null);
     setStatus("connecting");
+    // Set when the server ends the session (error or session_ended). Setup below may
+    // still be awaiting mic/worklet; its teardown errors must not replace the
+    // server's message, and it must not flip the status back to "live".
+    let endedByServer = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
@@ -109,13 +113,15 @@ export default function LiveTalk({ onTranscript, onEnded }: LiveTalkProps) {
             if (msg.speaker === "user") stopPlayback(); // user's own speech interrupts playback
             onTranscript?.({ speaker: msg.speaker, text: msg.text, final: msg.final });
           } else if (msg.type === "session_ended") {
+            endedByServer = true;
+            stop();
             setStatus("ended");
             onEnded?.(msg.reason);
-            stop();
           } else if (msg.type === "error") {
+            endedByServer = true;
+            stop();
             setError(msg.message);
             setStatus("error");
-            stop();
           }
         } else {
           playChunk(event.data as ArrayBuffer);
@@ -151,11 +157,13 @@ export default function LiveTalk({ onTranscript, onEnded }: LiveTalkProps) {
       };
       source.connect(workletNode);
 
+      if (endedByServer || ws.readyState !== WebSocket.OPEN) return;
       setStatus("live");
     } catch (err) {
+      if (endedByServer) return; // keep the server's explanation
+      stop();
       setError(err instanceof Error ? err.message : "Couldn't start live mode.");
       setStatus("error");
-      stop();
     }
   }, [onEnded, onTranscript, playChunk, stop, stopPlayback]);
 

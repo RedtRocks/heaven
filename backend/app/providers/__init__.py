@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 
+class ProviderNotConfigured(RuntimeError):
+    """A provider is missing setup the Owner must do (e.g. an API key). The message says what."""
+
+
 @dataclass(frozen=True)
 class ChatMessage:
     role: Literal["user", "assistant"]

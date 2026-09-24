@@ -5,7 +5,15 @@ no matter how the calling code obtained the provider.
 """
 
 from app.config import Settings, get_settings
-from app.providers import LLM, Embedder, FaceRenderer, LiveVoiceSession, SpeechToText, VoiceSynth
+from app.providers import (
+    LLM,
+    Embedder,
+    FaceRenderer,
+    LiveVoiceSession,
+    ProviderNotConfigured,
+    SpeechToText,
+    VoiceSynth,
+)
 
 _overrides: dict[str, object] = {}
 
@@ -98,6 +106,8 @@ async def get_live(
             return await session(system_instruction, tools)  # type: ignore[misc]
         return session  # type: ignore[return-value]
     s = settings or get_settings()
+    if not s.gemini_api_key:
+        raise ProviderNotConfigured("Live mode needs GEMINI_API_KEY in .env.")
     from app.providers.live_gemini import GeminiLiveSession
 
     return await GeminiLiveSession.connect(

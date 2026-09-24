@@ -172,3 +172,16 @@ async def test_real_gemini_live_session_connects():
             break
     finally:
         await live.close()
+
+
+def test_live_without_api_key_says_what_is_missing(client, monkeypatch):
+    """No key and no fake: the Owner is told exactly what to set, not "try again"."""
+    from app.config import Settings
+    from app.providers import registry
+
+    registry._overrides.pop("live", None)
+    monkeypatch.setattr(registry, "get_settings", lambda: Settings(gemini_api_key=""))
+    with client.websocket_connect("/live/assistant") as ws:
+        message = ws.receive_json()
+    assert message["type"] == "error"
+    assert "GEMINI_API_KEY" in message["message"]
