@@ -17,8 +17,10 @@
 - `api.py`: `POST /entries`, `POST /entries/audio` (saves the uploaded audio under `data/audio/` — gitignored — then transcribes and splits), `GET /memories` (Owner's full view), `PATCH /memories/{id}` (`sealed`, `proposed_visibility`, `text` — re-embeds on text change, `owner_reviewed`), `GET /digest`, `POST /assistant/chat` (recall with `visitor_id=None`, second-person system prompt, `[Memory <id>]` citation format parsed and filtered to only IDs actually recalled, and an honest "I don't have a memory of that" when nothing matches instead of calling the LLM at all).
 
 **Providers**
-- `app/providers/embed_gemini.py`: `GeminiEmbedder` using `gemini-embedding-001` with `output_dimensionality` truncation (default 768 dims, configurable via `EMBEDDING_DIMENSIONS`). Registered as `get_embedder()` in `app/providers/registry.py`.
-- `app/archive/api.py` wraps `get_llm`/`get_embedder`/`get_stt` in thin `Depends()`-friendly functions (`llm_dependency` etc.) instead of calling the registry directly from route bodies — needed so tests can override providers via FastAPI's `dependency_overrides` the standard way; calling the registry functions directly inside a handler body is invisible to FastAPI's DI and can't be overridden.
+- `app/providers/embed_gemini.py`: `GeminiEmbedder` using `gemini-embedding-001` with `output_dimensionality` truncation (default 768 dims, configurable via `EMBEDDING_DIMENSIONS`). Registered as `get_embedder()` in `app/providers/registry.py`, checking `registry._overrides["embedder"]` first (shared override mechanism from the test-infra merge, see below).
+- `app/archive/api.py` wraps `get_llm`/`get_embedder`/`get_stt` in thin `Depends()`-friendly functions (`_get_llm`, `_get_embedder`, `_get_stt`, matching `app/persona/api.py`'s naming) instead of calling the registry directly from route bodies — needed so tests can override providers via FastAPI's `dependency_overrides` the standard way.
+
+**Wired into the Clone (post-merge)**: `app/persona/recall.py`'s `get_memory_recall(session)` now returns a real `ArchiveMemoryRecall` instead of feat/seed's placeholder that always returned no Memories, so `POST /clone/chat` gets real, visibility-filtered Memories.
 
 ## How to run
 
@@ -27,17 +29,25 @@ cd backend
 uv run uvicorn app.main:app --reload
 ```
 
-Needs a real `GEMINI_API_KEY` in `.env` for `/entries`, `/entries/audio`, and `/assistant/chat` to actually call the LLM/embedder; the test suite never needs one (fakes throughout).
+Needs a real `GEMINI_API_KEY` in `.env` for `/entries`, `/entries/audio`, `/assistant/chat`, and `/clone/chat` to actually call the LLM/embedder; the test suite never needs one (fakes throughout).
 
 ## Test results
 
+Merged `main` (shared test harness, persona/feat-seed module, CI) into `feat/memory` before finishing, per the coordinator's request, and adapted:
+- Dropped my own `tests/conftest.py`/`tests/fakes.py` for main's shared versions (`TEST_DATABASE_URL` env var, `db_session`, registry-override-based `client` fixture, `live` marker).
+- `get_embedder()` now checks `registry._overrides["embedder"]` like the other `get_<kind>` functions.
+- Renamed my provider-dependency wrappers to `_get_llm`/`_get_embedder`/`_get_stt` to match `app/persona/api.py`.
+- `tests/test_recall.py` keeps one small local `_ExactVectorEmbedder` (not a shared fake) for the two tests that need exact control over cosine-distance ranking, which the shared hash-based `FakeEmbedder` can't give.
+- Updated `tests/test_api.py`'s (persona's) local `client` fixture to also `registry.override(embedder=...)`, since its clone_chat tests didn't need an embedder override before my real `MemoryRecall` was wired in.
+
 ```
 cd backend && uv run pytest -q
-................................................................
-64 passed in 5.56s
+........................................................................ [ 52%]
+..................................................................       [100%]
+138 passed in 7.28s
 ```
 
-Breakdown: 27 visibility table-driven tests (+4 design-case tests folded into the 27), 11 splitter tests (fake LLM, no DB), 6 service tests, 3 recall tests, 5 digest tests, 9 API tests (all against the real local Postgres/pgvector at `test_memory`, per common-rules.md #7 — each test runs in its own rolled-back transaction so nothing persists between tests or collides with other agents' runs), plus the pre-existing 3 registry tests.
+Breakdown of the memory-module tests specifically: 27 visibility table-driven tests (+4 design-case tests folded into the 27), 11 splitter tests (fake LLM, no DB), 6 service tests, 3 recall tests, 5 digest tests, 9 archive API tests (all against the real local Postgres/pgvector at `test_memory`, per common-rules.md #7 — each test runs in its own rolled-back transaction). The rest (138 total) come from the merged persona/feat-seed and test-infra work.
 
 ## Deviations from the brief
 
