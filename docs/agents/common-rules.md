@@ -10,7 +10,7 @@ You are one of several agents building Keepsake in parallel. Each agent has its 
    - Vendor SDKs (google-genai, openai, groq, chatterbox, etc.) are imported ONLY inside `backend/app/providers/`, behind the Protocols in `backend/app/providers/__init__.py`. Other code gets providers through `backend/app/providers/registry.py`.
    - Shared contracts already exist: `app/people/models.py` (Person), `app/conversation/contracts.py` (MemoryRecall, RecalledMemory), and the Embedder Protocol. Don't change their signatures. If you need something extra, add it in your own module.
    - Postgres + pgvector runs at `127.0.0.1:5433` (see `.env.example`). Tables are created with `Base.metadata.create_all` (no migrations yet).
-   - Tests go in `backend/tests/`, run with `cd backend && uv run pytest -q`. There are NO real API keys. Tests must use fake providers and must pass before you finish.
+   - Tests go in `backend/tests/`, run with `cd backend && uv run pytest -q`. There are NO real API keys. Tests must use fake providers and must pass before you finish. See `docs/testing.md` for the guide.
    - Add dependencies with `uv add`. Heavy ones (torch and so on) go in an optional group: `uv add --optional <group> <pkg>`.
 4. Web app: Next.js + TypeScript in `web/`, using pnpm.
 5. Never commit personal data, audio, video or model weights. `likeness/` and `data/` are gitignored.
