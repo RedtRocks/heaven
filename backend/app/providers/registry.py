@@ -1,7 +1,7 @@
 """Picks provider implementations from config. The only place that knows which vendor is in use."""
 
 from app.config import Settings, get_settings
-from app.providers import LLM, SpeechToText
+from app.providers import LLM, Embedder, SpeechToText
 
 
 def get_llm(settings: Settings | None = None) -> LLM:
@@ -22,3 +22,12 @@ def get_stt(settings: Settings | None = None) -> SpeechToText:
     from app.providers.stt_groq import GroqSpeechToText
 
     return GroqSpeechToText(s.groq_api_key, s.groq_stt_model)
+
+
+def get_embedder(settings: Settings | None = None) -> Embedder:
+    s = settings or get_settings()
+    if s.embedder_provider == "gemini":
+        from app.providers.embed_gemini import GeminiEmbedder
+
+        return GeminiEmbedder(s.gemini_api_key, s.gemini_embedding_model, s.embedding_dimensions)
+    raise ValueError(f"Unknown EMBEDDER_PROVIDER: {s.embedder_provider!r}")

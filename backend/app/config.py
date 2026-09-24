@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_stt_model: str = "whisper-large-v3-turbo"
 
+    embedder_provider: str = "gemini"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 768
+
+    # Days a new Memory waits before it's available to the Clone (ADR 0001).
+    holding_period_days: int = 7
+    # How many days ahead the Release Digest looks for Memories about to release.
+    digest_window_days: int = 3
+
     # Local files holding the Owner's Likeness (voice clips, face assets). Never committed.
     likeness_dir: Path = REPO_ROOT / "likeness"
 
