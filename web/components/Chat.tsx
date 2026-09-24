@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { post } from "@/lib/api";
+import VideoReplyButton from "./VideoReplyButton";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   citations?: number[];
+  videoUrl?: string;
 }
 
 interface ChatResponse {
@@ -17,14 +19,23 @@ interface ChatResponse {
 interface ChatProps {
   endpoint: string;
   visitorId?: number;
+  enableVideo?: boolean;
 }
 
-export default function Chat({ endpoint, visitorId }: ChatProps) {
+export default function Chat({ endpoint, visitorId, enableVideo }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  function handleVideoReady(messageIdx: number, videoUrl: string) {
+    setMessages((prevMessages) => {
+      const updated = [...prevMessages];
+      updated[messageIdx] = { ...updated[messageIdx], videoUrl };
+      return updated;
+    });
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -108,6 +119,15 @@ export default function Chat({ endpoint, visitorId }: ChatProps) {
               }`}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.videoUrl && (
+                <div className="mt-2">
+                  <video
+                    src={msg.videoUrl}
+                    controls
+                    className="w-full rounded"
+                  />
+                </div>
+              )}
               {msg.citations && msg.citations.length > 0 && (
                 <div className="mt-2 text-sm border-t border-opacity-30 pt-2">
                   <p className="font-semibold mb-1">Citations:</p>
@@ -118,6 +138,14 @@ export default function Chat({ endpoint, visitorId }: ChatProps) {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+              {msg.role === "assistant" && enableVideo && !msg.videoUrl && (
+                <div className="mt-2">
+                  <VideoReplyButton
+                    text={msg.content}
+                    onVideoReady={(url) => handleVideoReady(idx, url)}
+                  />
                 </div>
               )}
             </div>

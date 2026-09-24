@@ -14,7 +14,7 @@ export default function ClonePage() {
           <FaceStage />
         </div>
         <div className="flex-1 min-h-0">
-          <Chat endpoint="/clone/chat" />
+          <Chat endpoint="/clone/chat" enableVideo={true} />
         </div>
       </div>
     </div>
