@@ -22,3 +22,9 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "unit: tests that require no database or network",
+    "db: tests that require the test database",
+    "slow: tests that take a long time (skipped by default)",
+]
+addopts = "-m 'not slow'"
