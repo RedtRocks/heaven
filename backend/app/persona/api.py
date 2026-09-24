@@ -20,6 +20,18 @@ from app.providers.registry import get_llm, get_stt
 router = APIRouter()
 
 
+# get_llm/get_stt take an optional `settings` argument for tests outside FastAPI.
+# Passed straight to Depends(), FastAPI would try to resolve `settings` itself
+# (as a request body field, since Settings is a pydantic model). These no-arg
+# wrappers are what routes actually depend on.
+def _get_llm() -> LLM:
+    return get_llm()
+
+
+def _get_stt() -> SpeechToText:
+    return get_stt()
+
+
 # ---------------------------------------------------------------------------
 # Seed Interview
 # ---------------------------------------------------------------------------
@@ -108,7 +120,7 @@ def next_seed_question(session: Session = Depends(get_session)) -> SeedQuestionO
 def answer_seed_question(
     body: SeedAnswerIn,
     session: Session = Depends(get_session),
-    llm: LLM = Depends(get_llm),
+    llm: LLM = Depends(_get_llm),
 ) -> SeedAnswerOut:
     question = _question_for_id(session, body.question_id)
     if _already_answered(session, body.question_id):
@@ -124,8 +136,8 @@ async def answer_seed_question_audio(
     question_id: str = Form(...),
     audio: UploadFile = File(...),
     session: Session = Depends(get_session),
-    llm: LLM = Depends(get_llm),
-    stt: SpeechToText = Depends(get_stt),
+    llm: LLM = Depends(_get_llm),
+    stt: SpeechToText = Depends(_get_stt),
 ) -> SeedAnswerOut:
     question = _question_for_id(session, question_id)
     if _already_answered(session, question_id):
@@ -290,7 +302,7 @@ class CloneChatOut(BaseModel):
 def clone_chat(
     body: CloneChatIn,
     session: Session = Depends(get_session),
-    llm: LLM = Depends(get_llm),
+    llm: LLM = Depends(_get_llm),
 ) -> CloneChatOut:
     recall = get_memory_recall()
     recalled = recall.recall(body.message, body.visitor_id)
