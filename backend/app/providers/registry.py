@@ -5,7 +5,7 @@ no matter how the calling code obtained the provider.
 """
 
 from app.config import Settings, get_settings
-from app.providers import LLM, SpeechToText
+from app.providers import LLM, SpeechToText, VoiceSynth
 
 _overrides: dict[str, object] = {}
 
@@ -41,3 +41,20 @@ def get_stt(settings: Settings | None = None) -> SpeechToText:
     from app.providers.stt_groq import GroqSpeechToText
 
     return GroqSpeechToText(s.groq_api_key, s.groq_stt_model)
+
+
+_voice_singleton: VoiceSynth | None = None
+
+
+def get_voice(settings: Settings | None = None) -> VoiceSynth:
+    """Cached across calls: Chatterbox's model is slow to load, so we load it once."""
+    if "voice" in _overrides:
+        return _overrides["voice"]  # type: ignore[return-value]
+    global _voice_singleton
+    if _voice_singleton is None:
+        s = settings or get_settings()
+        from app.providers.tts_chatterbox import ChatterboxVoiceSynth
+
+        reference_path = s.likeness_dir / "voice" / "reference.wav"
+        _voice_singleton = ChatterboxVoiceSynth(reference_path)
+    return _voice_singleton
