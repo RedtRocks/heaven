@@ -46,9 +46,11 @@ def test_get_face_override_wins():
 
 
 @pytest.mark.unit
-def test_get_voice_without_override_raises_not_implemented():
-    with pytest.raises(NotImplementedError):
-        registry.get_voice()
+def test_get_voice_without_override_returns_chatterbox():
+    """feat/voice wired up a real VoiceSynth (Chatterbox), so /face/jobs's `text` input works."""
+    from app.providers.tts_chatterbox import ChatterboxVoiceSynth
+
+    assert isinstance(registry.get_voice(), ChatterboxVoiceSynth)
 
 
 @pytest.mark.db
