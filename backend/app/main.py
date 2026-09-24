@@ -7,6 +7,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import create_all, get_session
+from app.face import models as _face_models  # noqa: F401  (registers tables)
+from app.face.api import router as face_router
 from app.people import models as _people_models  # noqa: F401  (registers tables)
 from app.persona import models as _persona_models  # noqa: F401  (registers tables)
 from app.persona.api import router as persona_router
@@ -25,6 +27,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"]
 )
 app.include_router(persona_router)
+app.include_router(face_router)
 
 
 @app.get("/health")
