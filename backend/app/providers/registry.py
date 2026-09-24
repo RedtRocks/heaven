@@ -5,7 +5,7 @@ no matter how the calling code obtained the provider.
 """
 
 from app.config import Settings, get_settings
-from app.providers import LLM, SpeechToText, VoiceSynth
+from app.providers import LLM, Embedder, SpeechToText, VoiceSynth
 
 _overrides: dict[str, object] = {}
 
@@ -41,6 +41,17 @@ def get_stt(settings: Settings | None = None) -> SpeechToText:
     from app.providers.stt_groq import GroqSpeechToText
 
     return GroqSpeechToText(s.groq_api_key, s.groq_stt_model)
+
+
+def get_embedder(settings: Settings | None = None) -> Embedder:
+    if "embedder" in _overrides:
+        return _overrides["embedder"]  # type: ignore[return-value]
+    s = settings or get_settings()
+    if s.embedder_provider == "gemini":
+        from app.providers.embed_gemini import GeminiEmbedder
+
+        return GeminiEmbedder(s.gemini_api_key, s.gemini_embedding_model, s.embedding_dimensions)
+    raise ValueError(f"Unknown EMBEDDER_PROVIDER: {s.embedder_provider!r}")
 
 
 _voice_singleton: VoiceSynth | None = None

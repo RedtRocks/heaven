@@ -6,24 +6,31 @@ from app.main import app
 from app.people.models import Person
 from app.persona.api import _get_llm, _get_stt
 from app.persona.models import Trait
-from tests.fakes import FakeLLM, FakeSpeechToText
+from app.providers import registry
+from tests.fakes import FakeEmbedder, FakeLLM, FakeSpeechToText
 
 
 @pytest.fixture
 def client(db_session):
     fake_llm = FakeLLM(reply="[]")
     fake_stt = FakeSpeechToText(text="my favourite food is biryani")
+    fake_embedder = FakeEmbedder()
 
     app.dependency_overrides[get_session] = lambda: db_session
     app.dependency_overrides[_get_llm] = lambda: fake_llm
     app.dependency_overrides[_get_stt] = lambda: fake_stt
+    # clone_chat's MemoryRecall calls registry.get_embedder() directly (not via
+    # Depends()), since app/persona/recall.py builds it from the archive module.
+    registry.override(embedder=fake_embedder)
     try:
         with TestClient(app) as test_client:
             test_client.fake_llm = fake_llm
             test_client.fake_stt = fake_stt
+            test_client.fake_embedder = fake_embedder
             yield test_client
     finally:
         app.dependency_overrides.clear()
+        registry.clear_overrides()
 
 
 def test_seed_next_returns_a_question_then_none_once_all_answered(client):

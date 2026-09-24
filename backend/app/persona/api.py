@@ -304,7 +304,7 @@ def clone_chat(
     session: Session = Depends(get_session),
     llm: LLM = Depends(_get_llm),
 ) -> CloneChatOut:
-    recall = get_memory_recall()
+    recall = get_memory_recall(session)
     recalled = recall.recall(body.message, body.visitor_id)
     system = build_clone_system_prompt(session, body.visitor_id, recalled)
     messages = [ChatMessage(m.role, m.content) for m in body.history]

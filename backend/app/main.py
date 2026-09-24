@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.archive import models as _archive_models  # noqa: F401  (registers tables)
+from app.archive.api import router as archive_router
 from app.db import create_all, get_session
 from app.people import models as _people_models  # noqa: F401  (registers tables)
 from app.persona import models as _persona_models  # noqa: F401  (registers tables)
@@ -25,6 +27,7 @@ app = FastAPI(title="Keepsake", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"]
 )
+app.include_router(archive_router)
 app.include_router(persona_router)
 app.include_router(voice_router)
 

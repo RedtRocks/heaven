@@ -106,7 +106,6 @@ def main() -> None:
     llm = get_llm()
     stt = get_stt()
     voice = get_voice()
-    recall = get_memory_recall()
 
     history: list[ChatMessage] = []
     print("Voice loop ready. Press Enter to talk, Ctrl+C to quit.")
@@ -119,6 +118,7 @@ def main() -> None:
 
         audio = _record_until_enter()
         with SessionLocal() as session:
+            recall = get_memory_recall(session)
             heard, reply, wav_bytes = run_turn(
                 audio, llm=llm, stt=stt, voice=voice, recall=recall, session=session, history=history
             )
