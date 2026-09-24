@@ -69,7 +69,11 @@ _Avoid_: Contact, access tier
 ## Conversation
 
 **Memory Assistant**:
-The Owner talking to their own full archive. It addresses the Owner in the second person ("you said…").
+The Owner talking to their own full archive. It addresses the Owner in the second person ("you said…") and speaks in a Stock Voice, not the Owner's Likeness.
+
+**Stock Voice**:
+A generic provider voice that isn't the Owner's. Used by the Memory Assistant and for testing, never by the Clone.
+_Avoid_: Default voice, TTS voice
 _Avoid_: Clone, bot
 
 **Clone**:
@@ -77,7 +81,7 @@ A first-person persona of the Owner that Visitors talk to. It sees only a filter
 _Avoid_: Avatar, AI version, twin
 
 **Likeness**:
-The Owner's cloned voice and face, made only from recordings the Owner provides. The Clone speaks and appears through it.
+The Owner's cloned voice and face, made only from recordings the Owner provides. The Clone speaks and appears only through it, never through a stock voice.
 _Avoid_: Deepfake, avatar
 
 **Legacy Mode**:
