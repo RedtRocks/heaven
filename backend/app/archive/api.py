@@ -16,14 +16,29 @@ from app.archive.digest import build_release_digest, render_digest_text
 from app.archive.models import VISIBILITY_KINDS, Memory
 from app.archive.recall import ArchiveMemoryRecall
 from app.archive.service import create_entry_and_memories
-from app.config import REPO_ROOT, get_settings
+from app.config import REPO_ROOT
 from app.db import get_session
-from app.providers import ChatMessage
+from app.providers import LLM, ChatMessage, Embedder, SpeechToText
 from app.providers.registry import get_embedder, get_llm, get_stt
 
 router = APIRouter(prefix="", tags=["archive"])
 
 AUDIO_ENTRIES_DIR = REPO_ROOT / "data" / "audio"
+
+
+# Thin wrappers around the registry so tests can override providers via FastAPI's
+# app.dependency_overrides (overriding get_llm/get_embedder/get_stt directly wouldn't
+# work, since FastAPI only intercepts calls that go through Depends()).
+def llm_dependency() -> LLM:
+    return get_llm()
+
+
+def embedder_dependency() -> Embedder:
+    return get_embedder()
+
+
+def stt_dependency() -> SpeechToText:
+    return get_stt()
 
 
 class EntryCreate(BaseModel):
@@ -72,24 +87,33 @@ def _memory_out(memory: Memory) -> MemoryOut:
 
 
 @router.post("/entries", response_model=EntryOut)
-def create_entry(body: EntryCreate, session: Session = Depends(get_session)) -> EntryOut:
-    entry, memories = create_entry_and_memories(session, body.text, get_llm(), get_embedder())
+def create_entry(
+    body: EntryCreate,
+    session: Session = Depends(get_session),
+    llm: LLM = Depends(llm_dependency),
+    embedder: Embedder = Depends(embedder_dependency),
+) -> EntryOut:
+    entry, memories = create_entry_and_memories(session, body.text, llm, embedder)
     return EntryOut(entry_id=entry.id, memories=[_memory_out(m) for m in memories])
 
 
 @router.post("/entries/audio", response_model=EntryOut)
-def create_entry_from_audio(file: UploadFile, session: Session = Depends(get_session)) -> EntryOut:
+def create_entry_from_audio(
+    file: UploadFile,
+    session: Session = Depends(get_session),
+    llm: LLM = Depends(llm_dependency),
+    embedder: Embedder = Depends(embedder_dependency),
+    stt: SpeechToText = Depends(stt_dependency),
+) -> EntryOut:
     audio_bytes = file.file.read()
-    text = get_stt().transcribe(audio_bytes, filename=file.filename or "audio.wav")
+    text = stt.transcribe(audio_bytes, filename=file.filename or "audio.wav")
 
     AUDIO_ENTRIES_DIR.mkdir(parents=True, exist_ok=True)
     suffix = f".{file.filename.rsplit('.', 1)[-1]}" if file.filename and "." in file.filename else ".wav"
     audio_path = AUDIO_ENTRIES_DIR / f"{uuid.uuid4()}{suffix}"
     audio_path.write_bytes(audio_bytes)
 
-    entry, memories = create_entry_and_memories(
-        session, text, get_llm(), get_embedder(), audio_path=str(audio_path)
-    )
+    entry, memories = create_entry_and_memories(session, text, llm, embedder, audio_path=str(audio_path))
     return EntryOut(entry_id=entry.id, memories=[_memory_out(m) for m in memories])
 
 
@@ -107,7 +131,12 @@ class MemoryPatch(BaseModel):
 
 
 @router.patch("/memories/{memory_id}", response_model=MemoryOut)
-def patch_memory(memory_id: int, body: MemoryPatch, session: Session = Depends(get_session)) -> MemoryOut:
+def patch_memory(
+    memory_id: int,
+    body: MemoryPatch,
+    session: Session = Depends(get_session),
+    embedder: Embedder = Depends(embedder_dependency),
+) -> MemoryOut:
     memory = session.get(Memory, memory_id)
     if memory is None:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -122,7 +151,7 @@ def patch_memory(memory_id: int, body: MemoryPatch, session: Session = Depends(g
         memory.owner_reviewed = body.owner_reviewed
     if body.text is not None and body.text != memory.text:
         memory.text = body.text
-        [embedding] = get_embedder().embed([body.text]) or [None]
+        [embedding] = embedder.embed([body.text]) or [None]
         memory.embedding = embedding
 
     session.commit()
@@ -171,10 +200,15 @@ _CITATION_RE = re.compile(r"\[Memory (\d+)\]")
 
 
 @router.post("/assistant/chat", response_model=AssistantChatResponse)
-def assistant_chat(body: AssistantChatRequest, session: Session = Depends(get_session)) -> AssistantChatResponse:
+def assistant_chat(
+    body: AssistantChatRequest,
+    session: Session = Depends(get_session),
+    llm: LLM = Depends(llm_dependency),
+    embedder: Embedder = Depends(embedder_dependency),
+) -> AssistantChatResponse:
     """The Memory Assistant: the Owner talking to their own full archive (visitor_id=None)."""
 
-    recall = ArchiveMemoryRecall(session, get_embedder())
+    recall = ArchiveMemoryRecall(session, embedder)
     recalled = recall.recall(body.message, visitor_id=None)
 
     if not recalled:
@@ -192,7 +226,7 @@ def assistant_chat(body: AssistantChatRequest, session: Session = Depends(get_se
         "plainly instead of guessing.\n\nMemories:\n" + memory_lines
     )
     history_messages = [ChatMessage(role="assistant" if t.role == "assistant" else "user", content=t.content) for t in body.history]
-    reply = get_llm().complete([*history_messages, ChatMessage("user", body.message)], system=system)
+    reply = llm.complete([*history_messages, ChatMessage("user", body.message)], system=system)
 
     recalled_ids = {m.id for m in recalled}
     citations = sorted({int(cid) for cid in _CITATION_RE.findall(reply) if int(cid) in recalled_ids})
