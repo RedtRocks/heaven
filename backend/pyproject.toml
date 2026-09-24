@@ -14,6 +14,14 @@ dependencies = [
     "uvicorn[standard]>=0.53.0",
 ]
 
+[project.optional-dependencies]
+voice = [
+    "chatterbox-tts>=0.1.7",
+    "scipy>=1.18.1",
+    "sounddevice>=0.5.6",
+    "soundfile>=0.14.0",
+]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
