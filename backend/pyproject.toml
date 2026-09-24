@@ -29,6 +29,7 @@ musetalk = [
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [tool.pytest.ini_options]
@@ -40,6 +41,7 @@ markers = [
     "live: tests that call real APIs (skipped unless RUN_LIVE=1)",
 ]
 addopts = "-m 'not slow'"
+asyncio_mode = "strict"
 
 [tool.uv.sources]
 chatterbox-tts = { git = "https://github.com/resemble-ai/chatterbox.git", rev = "5de7a54aa4e5e2baadb0182dde554908b48b85c2" }

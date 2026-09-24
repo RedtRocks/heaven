@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     kaggle_poll_interval_seconds: float = 15.0
     kaggle_timeout_seconds: float = 1800.0
 
+    # Live mode (Memory Assistant only, Stock Voice - see ADR 0003 and
+    # docs/notes/live-mode.md). Gemini Live's free native-audio model as of the
+    # research date; check https://ai.google.dev/gemini-api/docs/pricing before relying
+    # on this, since model names moved from 2.5 to 3.x during 2026.
+    live_model: str = "gemini-2.5-flash-native-audio-preview-09-2025"
+    live_voice: str = "Puck"
+
 
 @lru_cache
 def get_settings() -> Settings:
