@@ -80,3 +80,9 @@ model, once cached, doesn't need to re-download.
   param and `backend/tests/test_face.py::test_get_voice_without_override_returns_chatterbox`.
 - `POST /voice/speak` is tested end-to-end against a `FakeVoiceSynth` in
   `backend/tests/test_voice_api.py`.
+
+## Follow-up, 2026-09-24 (coordinator)
+
+- **Nano is on GitHub main.** Installing `chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git` exposes `ChatterboxTurboTTS.from_pretrained("cpu", nano=True)` (repo `ResembleAI/chatterbox-nano`, GPT2-small backbone). The weights download worked (≈33 min on this connection) and are now in the local Hugging Face cache.
+- **Loading Nano also segfaulted (exit 139)**, with only **0.1 GB of RAM free** at load time. The standard model crashed the same way earlier at 0.8–1.4 GB free. Most of the 13.9 GB was held by desktop apps (browser ~3.3 GB, VS Code ~1.1 GB, WebView ~0.7 GB) plus memory compression, so **free RAM is the blocker, not the code.**
+- **Next step:** close the browser, then run `scratchpad`-style `bench.py` against Nano (or `scripts/bench_voice.py` after switching the provider). If Nano loads and runs near real time, switch `tts_chatterbox.py` to `ChatterboxTurboTTS(..., nano=True)` and pin the git dependency to a commit.
