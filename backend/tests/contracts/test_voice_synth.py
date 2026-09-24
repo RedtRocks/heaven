@@ -3,13 +3,42 @@
 Any class implementing the VoiceSynth protocol must pass these tests.
 """
 
+from pathlib import Path
+
 import pytest
 
 from app.providers import VoiceSynth
 from tests.fakes import FakeVoiceSynth
 
+try:
+    import chatterbox  # noqa: F401
 
-@pytest.fixture(params=[FakeVoiceSynth])
+    HAS_CHATTERBOX = True
+except ImportError:
+    HAS_CHATTERBOX = False
+
+
+def _make_chatterbox():
+    from app.providers.tts_chatterbox import ChatterboxVoiceSynth
+
+    # No reference clip needed for the contract test: ChatterboxVoiceSynth falls back to
+    # the model's default voice when the reference path doesn't exist.
+    return ChatterboxVoiceSynth(Path("does-not-exist.wav"))
+
+
+@pytest.fixture(
+    params=[
+        FakeVoiceSynth,
+        pytest.param(
+            _make_chatterbox,
+            marks=[
+                pytest.mark.slow,
+                pytest.mark.skipif(not HAS_CHATTERBOX, reason="voice extra (chatterbox-tts) not installed"),
+            ],
+            id="ChatterboxVoiceSynth",
+        ),
+    ]
+)
 def voice_synth_provider(request):
     """Parametrize tests over all VoiceSynth implementations.
 

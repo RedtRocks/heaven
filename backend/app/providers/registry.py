@@ -54,16 +54,21 @@ def get_embedder(settings: Settings | None = None) -> Embedder:
     raise ValueError(f"Unknown EMBEDDER_PROVIDER: {s.embedder_provider!r}")
 
 
+_voice_singleton: VoiceSynth | None = None
+
+
 def get_voice(settings: Settings | None = None) -> VoiceSynth:
+    """Cached across calls: Chatterbox's model is slow to load, so we load it once."""
     if "voice" in _overrides:
         return _overrides["voice"]  # type: ignore[return-value]
-    # No real VoiceSynth provider is wired up on this branch yet (voice cloning is a
-    # separate piece of work). `app/face/jobs.py` only needs this for the `text` input of
-    # POST /face/jobs; callers can pass `audio` directly to avoid depending on it.
-    raise NotImplementedError(
-        "No VoiceSynth provider is configured. Pass `audio` directly to /face/jobs instead "
-        "of `text` until voice cloning is wired up."
-    )
+    global _voice_singleton
+    if _voice_singleton is None:
+        s = settings or get_settings()
+        from app.providers.tts_chatterbox import ChatterboxVoiceSynth
+
+        reference_path = s.likeness_dir / "voice" / "reference.wav"
+        _voice_singleton = ChatterboxVoiceSynth(reference_path)
+    return _voice_singleton
 
 
 def get_face(settings: Settings | None = None) -> FaceRenderer:

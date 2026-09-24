@@ -16,6 +16,7 @@ from app.persona import models as _persona_models  # noqa: F401  (registers tabl
 from app.persona.api import router as persona_router
 from app.providers import ChatMessage
 from app.providers.registry import get_llm
+from app.voice.api import router as voice_router
 
 
 @asynccontextmanager
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 app.include_router(archive_router)
 app.include_router(persona_router)
+app.include_router(voice_router)
 app.include_router(face_router)
 
 

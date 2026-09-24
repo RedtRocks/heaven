@@ -15,6 +15,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+voice = [
+    "chatterbox-tts>=0.1.7",
+    "scipy>=1.18.1",
+    "sounddevice>=0.5.6",
+    "soundfile>=0.14.0",
+]
 musetalk = [
     "kaggle>=2.2.4",
 ]
