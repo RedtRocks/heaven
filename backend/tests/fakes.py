@@ -8,6 +8,7 @@ recording calls for assertion. Example:
     assert fake_llm.calls == [({'messages': [...], 'system': None})]
 """
 
+import hashlib
 from datetime import date
 from typing import Callable
 
@@ -24,16 +25,31 @@ class FakeLLM:
         result = fake_llm.complete([...])  # Returns 'no'
     """
 
-    def __init__(self, replies: list[str] | Callable[[list[ChatMessage], str | None], str] | None = None):
+    def __init__(
+        self,
+        replies: list[str] | Callable[[list[ChatMessage], str | None], str] | None = None,
+        reply: str | None = None,
+    ):
         """Initialize with scripted replies or a callable.
 
         Args:
             replies: Either a list of strings (cycled in order) or a callable that takes
                     (messages, system) and returns a string.
         """
-        self._replies = replies or ["OK"]
+        # `reply` is shorthand for a single reply returned every time
+        self._replies = replies or ([reply] if reply is not None else ["OK"])
         self._index = 0
         self.calls: list[dict] = []
+
+    @property
+    def reply(self) -> str:
+        return self._replies[0] if isinstance(self._replies, list) else ""
+
+    @reply.setter
+    def reply(self, value: str) -> None:
+        """Switch to always returning `value`."""
+        self._replies = [value]
+        self._index = 0
 
     def complete(self, messages: list[ChatMessage], system: str | None = None) -> str:
         """Return the next scripted reply and record the call."""
@@ -67,7 +83,8 @@ class FakeEmbedder:
         for text in texts:
             # Generate a stable vector from text hash. Use the hash to seed
             # pseudo-random floats in [-1, 1], normalized.
-            h = hash(text)
+            # hashlib, not hash(): str hashes are randomized per process
+            h = int.from_bytes(hashlib.sha256(text.encode()).digest()[:8], "big")
             vector = []
             for i in range(self.dimensions):
                 # Use hash and index to generate a stable pseudo-random float
