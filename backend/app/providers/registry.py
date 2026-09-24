@@ -5,7 +5,7 @@ no matter how the calling code obtained the provider.
 """
 
 from app.config import Settings, get_settings
-from app.providers import LLM, Embedder, SpeechToText, VoiceSynth
+from app.providers import LLM, Embedder, FaceRenderer, SpeechToText, VoiceSynth
 
 _overrides: dict[str, object] = {}
 
@@ -69,3 +69,19 @@ def get_voice(settings: Settings | None = None) -> VoiceSynth:
         reference_path = s.likeness_dir / "voice" / "reference.wav"
         _voice_singleton = ChatterboxVoiceSynth(reference_path)
     return _voice_singleton
+
+
+def get_face(settings: Settings | None = None) -> FaceRenderer:
+    if "face" in _overrides:
+        return _overrides["face"]  # type: ignore[return-value]
+    s = settings or get_settings()
+    if s.face_provider == "musetalk_kaggle":
+        from app.providers.face_musetalk_kaggle import MuseTalkKaggleFaceRenderer
+
+        return MuseTalkKaggleFaceRenderer(s)
+    if s.face_provider == "still":
+        from app.providers.face_still import StillPhotoFaceRenderer
+
+        return StillPhotoFaceRenderer(s)
+    raise ValueError(f"Unknown FACE_PROVIDER: {s.face_provider!r}")
+>>>>>>> main

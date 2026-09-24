@@ -21,6 +21,9 @@ voice = [
     "sounddevice>=0.5.6",
     "soundfile>=0.14.0",
 ]
+musetalk = [
+    "kaggle>=2.2.4",
+]
 
 [dependency-groups]
 dev = [
