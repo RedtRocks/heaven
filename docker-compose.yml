@@ -1,0 +1,17 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: keepsake-db
+    environment:
+      POSTGRES_USER: keepsake
+      POSTGRES_PASSWORD: keepsake
+      POSTGRES_DB: keepsake
+    # 5433 so it doesn't clash with the native Postgres on 5432
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - keepsake-db:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  keepsake-db:
